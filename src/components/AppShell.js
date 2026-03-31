@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/auth-context";
 import * as api from "../lib/api";
@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from "./ui/components";
 import { cn } from "../lib/utils";
 import {
   ShieldCheck, LogOut, LayoutDashboard, Footprints, Siren, FileText, Bell, Users, Settings,
-  UserCircle, Radio, MapPin, Phone, ChevronLeft, ChevronRight,
+  UserCircle, Radio, MapPin, Phone, ChevronLeft, ChevronRight, MoreHorizontal, X,
 } from "lucide-react";
 
 export default function AppShell({ children }) {
@@ -16,11 +16,25 @@ export default function AppShell({ children }) {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const moreMenuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target)) setShowMoreMenu(false);
+    };
+    if (showMoreMenu) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showMoreMenu]);
+
+  const handleLogout = async () => { setShowLogoutConfirm(false); await logout(); navigate("/"); };
 
   useEffect(() => {
     if (user) {
-      setUnread(api.getUnreadCount(user.id, user.role));
-      const interval = setInterval(() => setUnread(api.getUnreadCount(user.id, user.role)), 5000);
+      const load = () => api.getUnreadCount(user.id, user.role).then(setUnread);
+      load();
+      const interval = setInterval(load, 5000);
       return () => clearInterval(interval);
     }
   }, [user]);
@@ -60,7 +74,8 @@ export default function AppShell({ children }) {
   ];
 
   const navItems = user?.role === "security" ? securityNav : user?.role === "guardian" ? guardianNav : studentNav;
-  const bottomNavItems = navItems.slice(0, 5);
+  const bottomNavItems = navItems.length > 5 ? navItems.slice(0, 4) : navItems;
+  const overflowItems = navItems.length > 5 ? navItems.slice(4) : [];
 
   const isActive = (href) => {
     if (href === base) return location.pathname === base;
@@ -119,7 +134,7 @@ export default function AppShell({ children }) {
             )}
           </div>
           <button
-            onClick={() => { logout(); navigate("/"); }}
+            onClick={() => setShowLogoutConfirm(true)}
             className={cn("flex items-center gap-2 mt-3 w-full px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors", collapsed && "justify-center px-0")}
           >
             <LogOut className="h-4 w-4 shrink-0" />{!collapsed && <span>Logout</span>}
@@ -150,7 +165,7 @@ export default function AppShell({ children }) {
                 <AvatarFallback className="bg-red-100 text-red-700 text-[10px] font-semibold">{initials}</AvatarFallback>
               </Avatar>
             </Link>
-            <button onClick={() => { logout(); navigate("/"); }} className="p-2 text-muted-foreground hover:text-destructive transition-colors">
+            <button onClick={() => setShowLogoutConfirm(true)} className="p-2 text-muted-foreground hover:text-destructive transition-colors">
               <LogOut className="h-5 w-5" />
             </button>
           </div>
@@ -174,8 +189,48 @@ export default function AppShell({ children }) {
               <span className="text-[10px] font-medium truncate w-full text-center">{item.label}</span>
             </Link>
           ))}
+          {overflowItems.length > 0 && (
+            <div className="relative flex-1" ref={moreMenuRef}>
+              <button onClick={() => setShowMoreMenu(!showMoreMenu)}
+                className={cn("flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg w-full transition-colors",
+                  showMoreMenu ? "text-red-600" : "text-muted-foreground"
+                )}>
+                <MoreHorizontal className="h-5 w-5" />
+                <span className="text-[10px] font-medium">More</span>
+              </button>
+              {showMoreMenu && (
+                <div className="absolute bottom-full right-0 mb-2 w-48 bg-background border rounded-xl shadow-lg py-2 z-50">
+                  {overflowItems.map((item) => (
+                    <Link key={item.href} to={item.href} onClick={() => setShowMoreMenu(false)}
+                      className={cn("flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors",
+                        isActive(item.href) ? "text-red-600 bg-red-50 dark:bg-red-900/20" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      )}>
+                      {item.icon}
+                      <span>{item.label}</span>
+                      {item.badge > 0 && <span className="ml-auto bg-red-600 text-white text-[10px] font-bold rounded-full h-5 min-w-5 px-1 flex items-center justify-center">{item.badge}</span>}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </nav>
+
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="bg-background rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-full bg-red-100 dark:bg-red-900/30"><LogOut className="h-5 w-5 text-red-600" /></div>
+              <div><p className="font-semibold text-lg">Log Out</p><p className="text-sm text-muted-foreground">Are you sure you want to log out?</p></div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setShowLogoutConfirm(false)} className="flex-1 px-4 py-2.5 rounded-xl border text-sm font-medium hover:bg-muted transition-colors">Cancel</button>
+              <button onClick={handleLogout} className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors">Log Out</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

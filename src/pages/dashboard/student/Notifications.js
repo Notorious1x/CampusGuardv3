@@ -16,11 +16,11 @@ export default function NotificationsPage() {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState([]);
 
-  const refreshData = useCallback(() => { if (user) setNotifications(api.getNotifications(user.id, user.role)); }, [user]);
+  const refreshData = useCallback(async () => { if (user) setNotifications(await api.getNotifications(user.id, user.role)); }, [user]);
   useEffect(() => { refreshData(); }, [refreshData]);
 
-  const handleMarkRead = (id) => { api.markNotificationRead(id); refreshData(); };
-  const handleMarkAllRead = () => { if (user) { api.markAllNotificationsRead(user.id, user.role); refreshData(); } };
+  const handleMarkRead = async (id) => { await api.markNotificationRead(id); refreshData(); };
+  const handleMarkAllRead = async () => { if (user) { await api.markAllNotificationsRead(user.id, user.role); refreshData(); } };
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (

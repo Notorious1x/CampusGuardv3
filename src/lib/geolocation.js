@@ -1,12 +1,9 @@
 export const KNUST_CENTER = { latitude: 6.6745, longitude: -1.5716 };
 
 export function getCurrentPosition() {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      resolve({
-        latitude: KNUST_CENTER.latitude + (Math.random() - 0.5) * 0.01,
-        longitude: KNUST_CENTER.longitude + (Math.random() - 0.5) * 0.01,
-      });
+      reject(new Error("Geolocation not supported"));
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -17,18 +14,15 @@ export function getCurrentPosition() {
           accuracy: position.coords.accuracy,
         });
       },
-      () => {
-        resolve({
-          latitude: KNUST_CENTER.latitude + (Math.random() - 0.5) * 0.01,
-          longitude: KNUST_CENTER.longitude + (Math.random() - 0.5) * 0.01,
-        });
+      (error) => {
+        reject(error);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
     );
   });
 }
 
-export function watchPosition(callback) {
+export function watchPosition(callback, onError) {
   if (!navigator.geolocation) return null;
   return navigator.geolocation.watchPosition(
     (position) => {
@@ -38,7 +32,7 @@ export function watchPosition(callback) {
         accuracy: position.coords.accuracy,
       });
     },
-    undefined,
+    (error) => { if (onError) onError(error); },
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
   );
 }

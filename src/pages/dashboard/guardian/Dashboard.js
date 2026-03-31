@@ -12,12 +12,14 @@ export default function GuardianDashboard() {
   const [recentAlerts, setRecentAlerts] = useState([]);
   const [notifications, setNotifications] = useState([]);
 
-  const refreshData = useCallback(() => {
+  const refreshData = useCallback(async () => {
     if (!user) return;
-    const allWalks = api.getSafeWalks();
-    setActiveWalks(allWalks.filter((s) => s.shared_with.includes(user.id) && s.status === "active"));
-    setRecentAlerts(api.getAlerts().slice(0, 5));
-    setNotifications(api.getNotifications(user.id, user.role).filter((n) => !n.read).slice(0, 5));
+    const [allWalks, alerts, notifs] = await Promise.all([
+      api.getSafeWalks(), api.getAlerts(), api.getNotifications(user.id, user.role),
+    ]);
+    setActiveWalks(allWalks.filter((s) => s.shared_with?.includes(user.id) && s.status === "active"));
+    setRecentAlerts(alerts.slice(0, 5));
+    setNotifications(notifs.filter((n) => !n.read).slice(0, 5));
   }, [user]);
 
   useEffect(() => { refreshData(); const interval = setInterval(refreshData, 5000); return () => clearInterval(interval); }, [refreshData]);

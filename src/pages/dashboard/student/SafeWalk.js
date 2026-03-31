@@ -5,7 +5,7 @@ import { getCurrentPosition, watchPosition, clearWatch } from "../../../lib/geol
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input, Label, Badge } from "../../../components/ui/components";
 import { useToast } from "../../../components/ui/toast";
 import MapView from "../../../components/MapView";
-import { Footprints, CheckCircle2, Loader2, Play, Clock, Navigation } from "lucide-react";
+import { Footprints, CheckCircle2, Loader2, Play, Clock, Navigation, ExternalLink } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export default function SafeWalkPage() {
@@ -21,19 +21,19 @@ export default function SafeWalkPage() {
 
   const activeSession = sessions.find((s) => s.status === "active");
 
-  const refreshData = useCallback(() => {
+  const refreshData = useCallback(async () => {
     if (!user) return;
-    setSessions(api.getUserSafeWalks(user.id));
-    setContacts(api.getGuardians(user.id));
+    const [s, c] = await Promise.all([api.getUserSafeWalks(user.id), api.getGuardians(user.id)]);
+    setSessions(s); setContacts(c);
   }, [user]);
 
-  useEffect(() => { refreshData(); getCurrentPosition().then(setPosition); }, [refreshData]);
+  useEffect(() => { refreshData(); getCurrentPosition().then(setPosition).catch(() => {}); }, [refreshData]);
 
   useEffect(() => {
     if (activeSession) {
-      watchIdRef.current = watchPosition((pos) => {
+      watchIdRef.current = watchPosition(async (pos) => {
         setPosition(pos);
-        api.updateSafeWalkLocation(activeSession.id, pos.latitude, pos.longitude);
+        await api.updateSafeWalkLocation(activeSession.id, pos.latitude, pos.longitude);
       });
     }
     return () => clearWatch(watchIdRef.current);
@@ -43,20 +43,25 @@ export default function SafeWalkPage() {
     if (!user || !destination.trim()) { toast.error("Please enter a destination"); return; }
     setStarting(true);
     try {
-      const pos = await getCurrentPosition();
-      api.createSafeWalk(user.id, user.full_name, destination, pos.latitude, pos.longitude, selectedContacts);
+      let pos;
+      try { pos = await getCurrentPosition(); } catch {
+        toast.error("Could not get your location. Please enable GPS and try again.");
+        setStarting(false);
+        return;
+      }
+      await api.createSafeWalk(user.id, user.full_name, destination, pos.latitude, pos.longitude, selectedContacts);
       toast.success("Safe Walk started! Your location is now being shared.");
-      setDestination(""); setSelectedContacts([]); refreshData();
+      setDestination(""); setSelectedContacts([]); await refreshData();
     } catch { toast.error("Failed to start Safe Walk"); }
     setStarting(false);
   };
 
-  const checkIn = () => {
+  const checkIn = async () => {
     if (!activeSession) return;
-    api.updateSafeWalkStatus(activeSession.id, "completed");
+    await api.updateSafeWalkStatus(activeSession.id, "completed");
     clearWatch(watchIdRef.current); watchIdRef.current = null;
     toast.success("Checked in safely! Location sharing stopped.");
-    refreshData();
+    await refreshData();
   };
 
   const toggleContact = (id) => setSelectedContacts((prev) => prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]);
@@ -81,7 +86,11 @@ export default function SafeWalkPage() {
             {position && <MapView latitude={position.latitude} longitude={position.longitude} />}
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span className="flex items-center gap-1"><Clock className="h-4 w-4" />Started {formatDistanceToNow(new Date(activeSession.created_at), { addSuffix: true })}</span>
-              <span className="flex items-center gap-1"><Navigation className="h-4 w-4" />{position ? `${position.latitude.toFixed(5)}, ${position.longitude.toFixed(5)}` : "Getting location..."}</span>
+              {position ? (
+                <a href={`https://www.google.com/maps?q=${position.latitude},${position.longitude}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-blue-600 hover:text-blue-800"><Navigation className="h-4 w-4" />{position.latitude.toFixed(5)}, {position.longitude.toFixed(5)} <ExternalLink className="h-3 w-3" /></a>
+              ) : (
+                <span className="flex items-center gap-1"><Navigation className="h-4 w-4" />Getting location...</span>
+              )}
             </div>
             <Button onClick={checkIn} className="w-full bg-green-600 hover:bg-green-700 text-white" size="lg">
               <CheckCircle2 className="mr-2 h-5 w-5" />I've Arrived Safely

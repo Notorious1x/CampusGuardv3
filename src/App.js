@@ -101,6 +101,7 @@ function AppRoutes() {
       <Route path="/dashboard/security/users" element={<ProtectedRoute allowedRole="security"><SecurityUsers /></ProtectedRoute>} />
       <Route path="/dashboard/security/notifications" element={<ProtectedRoute allowedRole="security"><StudentNotifications /></ProtectedRoute>} />
       <Route path="/dashboard/security/settings" element={<ProtectedRoute allowedRole="security"><SecuritySettings /></ProtectedRoute>} />
+      <Route path="/dashboard/security/profile" element={<ProtectedRoute allowedRole="security"><StudentProfile /></ProtectedRoute>} />
 
       <Route path="/dashboard/guardian" element={<ProtectedRoute allowedRole="guardian"><GuardianDashboard /></ProtectedRoute>} />
       <Route path="/dashboard/guardian/tracking" element={<ProtectedRoute allowedRole="guardian"><GuardianTracking /></ProtectedRoute>} />

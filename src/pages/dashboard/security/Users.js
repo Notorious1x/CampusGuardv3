@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import * as api from "../../../lib/api";
 import { Card, CardContent, Button, Badge, Input } from "../../../components/ui/components";
 import { useToast } from "../../../components/ui/toast";
-import { Users, Trash2, Search, Mail, Phone, Calendar, KeyRound, Plus, Copy, CheckCircle2, Clock } from "lucide-react";
+import { Users, Search, Mail, Phone, Calendar, KeyRound, Plus, Copy, CheckCircle2, Clock } from "lucide-react";
 import { format } from "date-fns";
 
 const roleColors = { student: "bg-blue-100 text-blue-700", guardian: "bg-purple-100 text-purple-700", security: "bg-red-100 text-red-700" };
@@ -15,11 +15,10 @@ export default function SecurityUsersPage() {
   const [tab, setTab] = useState("users");
   const [generating, setGenerating] = useState(false);
 
-  const refreshData = useCallback(() => { setUsers(api.getAllUsers()); setSecurityIds(api.getSecurityIds()); }, []);
+  const refreshData = useCallback(async () => { const [u, s] = await Promise.all([api.getAllUsers(), api.getSecurityIds()]); setUsers(u); setSecurityIds(s); }, []);
   useEffect(() => { refreshData(); }, [refreshData]);
 
-  const handleDelete = (userId, name) => { if (!window.confirm(`Remove ${name}?`)) return; api.deleteUser(userId); toast.success(`${name} removed`); refreshData(); };
-  const handleGenerateIds = () => { setGenerating(true); api.generateNewSecurityIds(5); toast.success("Generated 5 new Security IDs"); refreshData(); setGenerating(false); };
+  const handleGenerateIds = async () => { setGenerating(true); await api.generateNewSecurityIds(5); toast.success("Generated 5 new Security IDs"); await refreshData(); setGenerating(false); };
   const handleCopyId = (code) => { navigator.clipboard.writeText(code); toast.success(`Copied ${code}`); };
 
   const filtered = users.filter((u) => u.full_name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase()));
@@ -52,7 +51,6 @@ export default function SecurityUsersPage() {
                   </div>
                   {u.student_id && <p className="text-xs text-muted-foreground mt-1">Student ID: {u.student_id}</p>}
                 </div>
-                <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => handleDelete(u.id, u.full_name)}><Trash2 className="h-4 w-4" /></Button>
               </div>
             </CardContent></Card>
           ))}</div>

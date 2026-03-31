@@ -14,8 +14,9 @@ const severityConfig = {
 export default function StudentAlertsPage() {
   const [broadcasts, setBroadcasts] = useState([]);
   useEffect(() => {
-    setBroadcasts(api.getBroadcasts());
-    const interval = setInterval(() => setBroadcasts(api.getBroadcasts()), 5000);
+    const load = () => api.getBroadcasts().then(setBroadcasts);
+    load();
+    const interval = setInterval(load, 5000);
     return () => clearInterval(interval);
   }, []);
 

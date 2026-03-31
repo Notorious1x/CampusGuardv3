@@ -21,26 +21,28 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     if (!user) return;
-    const s = api.getUserSettings(user.id);
-    setDarkMode(s.dark_mode);
-    document.documentElement.classList.toggle("dark", s.dark_mode);
+    api.getUserSettings(user.id).then((s) => {
+      setDarkMode(s.dark_mode);
+      document.documentElement.classList.toggle("dark", s.dark_mode);
+    });
   }, [user]);
 
-  const toggleDarkMode = () => {
+  const toggleDarkMode = async () => {
     if (!user) return;
     const newMode = !darkMode;
     setDarkMode(newMode);
     document.documentElement.classList.toggle("dark", newMode);
-    const settings = api.getUserSettings(user.id);
-    api.saveUserSettings({ ...settings, dark_mode: newMode });
+    const settings = await api.getUserSettings(user.id);
+    await api.saveUserSettings({ ...settings, dark_mode: newMode });
   };
 
-  const refreshData = useCallback(() => {
+  const refreshData = useCallback(async () => {
     if (!user) return;
-    setAlerts(api.getUserAlerts(user.id));
-    setSafeWalks(api.getUserSafeWalks(user.id));
-    setBroadcasts(api.getBroadcasts().slice(0, 3));
-    setGuardianCount(api.getGuardians(user.id).length);
+    const [a, s, b, g] = await Promise.all([
+      api.getUserAlerts(user.id), api.getUserSafeWalks(user.id),
+      api.getBroadcasts(), api.getGuardians(user.id),
+    ]);
+    setAlerts(a); setSafeWalks(s); setBroadcasts(b.slice(0, 3)); setGuardianCount(g.length);
   }, [user]);
 
   useEffect(() => {

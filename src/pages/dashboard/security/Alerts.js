@@ -11,11 +11,11 @@ export default function SecurityAlertsPage() {
   const toast = useToast();
   const [alerts, setAlerts] = useState([]);
 
-  const refreshData = useCallback(() => { setAlerts(api.getAlerts()); }, []);
+  const refreshData = useCallback(async () => { setAlerts(await api.getAlerts()); }, []);
   useEffect(() => { refreshData(); const interval = setInterval(refreshData, 5000); return () => clearInterval(interval); }, [refreshData]);
 
-  const handleStatusChange = (alertId, status) => {
-    api.updateAlertStatus(alertId, status, user?.id, user?.full_name);
+  const handleStatusChange = async (alertId, status) => {
+    await api.updateAlertStatus(alertId, status, user?.id, user?.full_name);
     toast.success(`Alert marked as ${status}`); refreshData();
   };
 

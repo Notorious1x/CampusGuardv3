@@ -12,16 +12,16 @@ export default function GuardiansPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", email: "", relationship: "" });
 
-  const refreshData = useCallback(() => { if (user) setGuardians(api.getGuardians(user.id)); }, [user]);
+  const refreshData = useCallback(async () => { if (user) setGuardians(await api.getGuardians(user.id)); }, [user]);
   useEffect(() => { refreshData(); }, [refreshData]);
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!user || !form.name.trim() || !form.phone.trim() || !form.relationship.trim()) { toast.error("Please fill in name, phone, and relationship"); return; }
-    api.addGuardian(user.id, form.name, form.phone, form.relationship, form.email || undefined);
+    await api.addGuardian(user.id, form.name, form.phone, form.relationship, form.email || undefined);
     toast.success("Guardian added"); setForm({ name: "", phone: "", email: "", relationship: "" }); setShowAdd(false); refreshData();
   };
 
-  const handleDelete = (id, name) => { api.deleteGuardian(id); toast.success(`${name} removed`); refreshData(); };
+  const handleDelete = async (id, name) => { await api.deleteGuardian(id); toast.success(`${name} removed`); refreshData(); };
 
   return (
     <div className="space-y-6">

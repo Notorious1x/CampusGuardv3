@@ -1,33 +1,4 @@
-const STORAGE_KEYS = {
-  USERS: "cg_users",
-  CURRENT_USER: "cg_current_user",
-  ALERTS: "cg_alerts",
-  SAFE_WALKS: "cg_safe_walks",
-  INCIDENTS: "cg_incidents",
-  GUARDIANS: "cg_guardians",
-  BROADCASTS: "cg_broadcasts",
-  NOTIFICATIONS: "cg_notifications",
-  SETTINGS: "cg_settings",
-  PASSWORDS: "cg_passwords",
-  SECURITY_IDS: "cg_security_ids",
-};
-
-function generateId() {
-  return Math.random().toString(36).substring(2) + Date.now().toString(36);
-}
-
-function getFromStorage(key, fallback) {
-  try {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function saveToStorage(key, data) {
-  localStorage.setItem(key, JSON.stringify(data));
-}
+import { supabase } from "./supabase";
 
 // ── Security IDs ──
 function generateSecurityCode() {
@@ -35,59 +6,39 @@ function generateSecurityCode() {
   return `KNS${digits}`;
 }
 
-function seedSecurityIds() {
-  const existing = getFromStorage(STORAGE_KEYS.SECURITY_IDS, []);
-  if (existing.length === 0) {
-    const initial = Array.from({ length: 10 }, () => ({
-      id: generateId(),
-      code: generateSecurityCode(),
-      used: false,
-      created_at: new Date().toISOString(),
-    }));
-    saveToStorage(STORAGE_KEYS.SECURITY_IDS, initial);
-  }
+export async function getSecurityIds() {
+  const { data } = await supabase.from("security_ids").select("*").order("created_at", { ascending: false });
+  return data || [];
 }
 
-export function getSecurityIds() {
-  seedSecurityIds();
-  return getFromStorage(STORAGE_KEYS.SECURITY_IDS, []);
-}
-
-export function generateNewSecurityIds(count = 5) {
-  const existing = getFromStorage(STORAGE_KEYS.SECURITY_IDS, []);
-  const existingCodes = new Set(existing.map((r) => r.code));
+export async function generateNewSecurityIds(count = 5) {
+  const { data: existing } = await supabase.from("security_ids").select("code");
+  const existingCodes = new Set((existing || []).map((r) => r.code));
   const newIds = [];
   let attempts = 0;
   while (newIds.length < count && attempts < 100) {
     const code = generateSecurityCode();
     if (!existingCodes.has(code)) {
       existingCodes.add(code);
-      newIds.push({ id: generateId(), code, used: false, created_at: new Date().toISOString() });
+      newIds.push({ code, used: false });
     }
     attempts++;
   }
-  saveToStorage(STORAGE_KEYS.SECURITY_IDS, [...existing, ...newIds]);
+  if (newIds.length > 0) await supabase.from("security_ids").insert(newIds);
   return newIds;
 }
 
-export function validateSecurityId(code) {
-  const ids = getSecurityIds();
-  const record = ids.find((r) => r.code === code.toUpperCase().trim());
-  if (!record) return { valid: false, error: "Invalid Security ID. Contact your administrator." };
-  if (record.used) return { valid: false, error: "This Security ID has already been claimed." };
+export async function validateSecurityId(code) {
+  const { data } = await supabase.from("security_ids").select("*").eq("code", code.toUpperCase().trim()).single();
+  if (!data) return { valid: false, error: "Invalid Security ID. Contact your administrator." };
+  if (data.used) return { valid: false, error: "This Security ID has already been claimed." };
   return { valid: true };
 }
 
-export function claimSecurityId(code, userId, userName) {
-  const ids = getFromStorage(STORAGE_KEYS.SECURITY_IDS, []);
-  const idx = ids.findIndex((r) => r.code === code.toUpperCase().trim());
-  if (idx !== -1) {
-    ids[idx].used = true;
-    ids[idx].used_by = userId;
-    ids[idx].used_by_name = userName;
-    ids[idx].claimed_at = new Date().toISOString();
-    saveToStorage(STORAGE_KEYS.SECURITY_IDS, ids);
-  }
+export async function claimSecurityId(code, userId, userName) {
+  await supabase.from("security_ids").update({
+    used: true, used_by: userId, used_by_name: userName, claimed_at: new Date().toISOString(),
+  }).eq("code", code.toUpperCase().trim());
 }
 
 // ── Demo Accounts ──
@@ -97,28 +48,13 @@ const DEMO_ACCOUNTS = [
   { email: "guardian@demo.com", password: "demo123", full_name: "Demo Guardian", student_id: "", phone: "+233241000003", role: "guardian" },
 ];
 
-export function seedDemoAccounts() {
-  const users = getFromStorage(STORAGE_KEYS.USERS, []);
-  const passwords = getFromStorage(STORAGE_KEYS.PASSWORDS, {});
-  let seeded = false;
-  DEMO_ACCOUNTS.forEach((demo) => {
-    if (!users.find((u) => u.email === demo.email)) {
-      users.push({
-        id: generateId(),
-        email: demo.email,
-        full_name: demo.full_name,
-        student_id: demo.student_id,
-        phone: demo.phone,
-        role: demo.role,
-        created_at: new Date().toISOString(),
-      });
-      passwords[demo.email] = demo.password;
-      seeded = true;
-    }
-  });
-  if (seeded) {
-    saveToStorage(STORAGE_KEYS.USERS, users);
-    saveToStorage(STORAGE_KEYS.PASSWORDS, passwords);
+export async function seedDemoAccounts() {
+  for (const demo of DEMO_ACCOUNTS) {
+    await supabase.auth.signUp({
+      email: demo.email,
+      password: demo.password,
+      options: { data: { full_name: demo.full_name, student_id: demo.student_id, phone: demo.phone, role: demo.role } },
+    });
   }
 }
 
@@ -127,310 +63,244 @@ export function getDemoAccounts() {
 }
 
 // ── Auth ──
-export function registerUser(email, password, full_name, student_id, phone, role = "student", security_code) {
+export async function loginUser(email, password) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) return { success: false, error: error.message };
+  const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
+  return { success: true, user: profile };
+}
+
+export async function registerUser(email, password, full_name, student_id, phone, role = "student", security_code) {
   if (role === "security") {
     if (!security_code) return { success: false, error: "Security ID is required for security personnel." };
-    const validation = validateSecurityId(security_code);
+    const validation = await validateSecurityId(security_code);
     if (!validation.valid) return { success: false, error: validation.error };
   }
-  const users = getFromStorage(STORAGE_KEYS.USERS, []);
-  if (users.find((u) => u.email === email)) {
-    return { success: false, error: "Email already registered" };
-  }
-  const user = {
-    id: generateId(),
-    email,
-    full_name,
-    student_id,
-    phone,
-    role,
-    created_at: new Date().toISOString(),
-  };
-  users.push(user);
-  saveToStorage(STORAGE_KEYS.USERS, users);
-  saveToStorage(STORAGE_KEYS.CURRENT_USER, user);
-  const passwords = getFromStorage(STORAGE_KEYS.PASSWORDS, {});
-  passwords[email] = password;
-  saveToStorage(STORAGE_KEYS.PASSWORDS, passwords);
+  const { data, error } = await supabase.auth.signUp({
+    email, password,
+    options: { data: { full_name, student_id: student_id || "", phone: phone || "", role } },
+  });
+  if (error) return { success: false, error: error.message };
   if (role === "security" && security_code) {
-    claimSecurityId(security_code, user.id, full_name);
+    await claimSecurityId(security_code, data.user.id, full_name);
   }
-  return { success: true, user };
+  const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
+  return { success: true, user: profile };
 }
 
-export function loginUser(email, password) {
-  const users = getFromStorage(STORAGE_KEYS.USERS, []);
-  const user = users.find((u) => u.email === email);
-  if (!user) return { success: false, error: "User not found" };
-  const passwords = getFromStorage(STORAGE_KEYS.PASSWORDS, {});
-  if (!passwords[email] || passwords[email] !== password) {
-    return { success: false, error: "Invalid password" };
-  }
-  saveToStorage(STORAGE_KEYS.CURRENT_USER, user);
-  return { success: true, user };
+export async function logoutUser() {
+  await supabase.auth.signOut();
 }
 
-export function logoutUser() {
-  localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+export async function getCurrentUser() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) return null;
+  const { data } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
+  return data;
 }
 
-export function getCurrentUser() {
-  return getFromStorage(STORAGE_KEYS.CURRENT_USER, null);
+export async function getAllUsers() {
+  const { data } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
+  return data || [];
 }
 
-export function getAllUsers() {
-  return getFromStorage(STORAGE_KEYS.USERS, []);
+export async function updateUser(userId, updates) {
+  await supabase.from("profiles").update(updates).eq("id", userId);
 }
 
-export function updateUser(userId, updates) {
-  const users = getFromStorage(STORAGE_KEYS.USERS, []);
-  const idx = users.findIndex((u) => u.id === userId);
-  if (idx !== -1) {
-    users[idx] = { ...users[idx], ...updates };
-    saveToStorage(STORAGE_KEYS.USERS, users);
-    const current = getCurrentUser();
-    if (current?.id === userId) saveToStorage(STORAGE_KEYS.CURRENT_USER, users[idx]);
-  }
-}
-
-export function deleteUser(userId) {
-  const users = getFromStorage(STORAGE_KEYS.USERS, []);
-  saveToStorage(STORAGE_KEYS.USERS, users.filter((u) => u.id !== userId));
+export async function deleteUser(userId) {
+  await supabase.from("profiles").delete().eq("id", userId);
 }
 
 // ── Settings ──
-export function getUserSettings(userId) {
-  const all = getFromStorage(STORAGE_KEYS.SETTINGS, []);
-  return all.find((s) => s.user_id === userId) || {
-    user_id: userId,
-    notifications_sos: true,
-    notifications_incidents: true,
-    notifications_broadcasts: true,
-    location_sharing: true,
-    dark_mode: false,
-    mute_non_emergency: false,
-  };
+const DEFAULT_SETTINGS = {
+  notifications_sos: true,
+  notifications_incidents: true,
+  notifications_broadcasts: true,
+  location_sharing: true,
+  dark_mode: false,
+  mute_non_emergency: false,
+};
+
+export async function getUserSettings(userId) {
+  const { data } = await supabase.from("settings").select("*").eq("user_id", userId).single();
+  return data || { user_id: userId, ...DEFAULT_SETTINGS };
 }
 
-export function saveUserSettings(settings) {
-  const all = getFromStorage(STORAGE_KEYS.SETTINGS, []);
-  const idx = all.findIndex((s) => s.user_id === settings.user_id);
-  if (idx !== -1) all[idx] = settings;
-  else all.push(settings);
-  saveToStorage(STORAGE_KEYS.SETTINGS, all);
+export async function saveUserSettings(settings) {
+  const { user_id, id, created_at, updated_at, ...rest } = settings;
+  const { data: existing } = await supabase.from("settings").select("id").eq("user_id", user_id).single();
+  if (existing) {
+    await supabase.from("settings").update({ ...rest, updated_at: new Date().toISOString() }).eq("user_id", user_id);
+  } else {
+    await supabase.from("settings").insert({ user_id, ...rest });
+  }
 }
 
 // ── SOS Alerts ──
-export function createAlert(userId, userName, userPhone, alertType, severity, latitude, longitude, message) {
-  const alert = {
-    id: generateId(), user_id: userId, user_name: userName, user_phone: userPhone,
-    alert_type: alertType, severity, message, latitude, longitude,
-    status: "pending", created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-  };
-  const alerts = getFromStorage(STORAGE_KEYS.ALERTS, []);
-  alerts.unshift(alert);
-  saveToStorage(STORAGE_KEYS.ALERTS, alerts);
-  addNotification("all-security", "New SOS Alert", `${userName} triggered a ${alertType} alert`, "sos");
-  return alert;
+export async function createAlert(userId, userName, userPhone, alertType, severity, latitude, longitude, message) {
+  const { data } = await supabase.from("alerts").insert({
+    user_id: userId, user_name: userName, user_phone: userPhone,
+    alert_type: alertType, severity, message, latitude, longitude, status: "pending",
+  }).select().single();
+  await addNotification("all-security", "New SOS Alert", `${userName} triggered a ${alertType} alert`, "sos");
+  return data;
 }
 
-export function getAlerts() {
-  return getFromStorage(STORAGE_KEYS.ALERTS, []).filter((a) => !a.archived);
+export async function getAlerts() {
+  const { data } = await supabase.from("alerts").select("*").eq("archived", false).order("created_at", { ascending: false });
+  return data || [];
 }
 
-export function getUserAlerts(userId) {
-  return getAlerts().filter((a) => a.user_id === userId);
+export async function getUserAlerts(userId) {
+  const { data } = await supabase.from("alerts").select("*").eq("user_id", userId).order("created_at", { ascending: false });
+  return data || [];
 }
 
-export function updateAlertStatus(alertId, status, responderId, responderName) {
-  const alerts = getFromStorage(STORAGE_KEYS.ALERTS, []);
-  const idx = alerts.findIndex((a) => a.id === alertId);
-  if (idx !== -1) {
-    alerts[idx].status = status;
-    alerts[idx].updated_at = new Date().toISOString();
-    if (responderId) alerts[idx].responder_id = responderId;
-    if (responderName) alerts[idx].responder_name = responderName;
-    if (status === "resolved") {
-      alerts[idx].archived = true;
-      alerts[idx].archived_at = new Date().toISOString();
-    }
-    saveToStorage(STORAGE_KEYS.ALERTS, alerts);
-    addNotification(alerts[idx].user_id, "Alert Update", `Your alert status changed to: ${status}`, "sos");
-  }
+export async function updateAlertStatus(alertId, status, responderId, responderName) {
+  const updates = { status, updated_at: new Date().toISOString() };
+  if (responderId) updates.responder_id = responderId;
+  if (responderName) updates.responder_name = responderName;
+  if (status === "resolved") { updates.archived = true; updates.archived_at = new Date().toISOString(); }
+  await supabase.from("alerts").update(updates).eq("id", alertId);
+  const { data: alert } = await supabase.from("alerts").select("user_id").eq("id", alertId).single();
+  if (alert) await addNotification(alert.user_id, "Alert Update", `Your alert status changed to: ${status}`, "sos");
 }
 
 // ── Safe Walk ──
-export function createSafeWalk(userId, userName, destination, latitude, longitude, sharedWith, durationMinutes = 30) {
-  const session = {
-    id: generateId(), user_id: userId, user_name: userName, destination, latitude, longitude,
+export async function createSafeWalk(userId, userName, destination, latitude, longitude, sharedWith, durationMinutes = 30) {
+  const { data } = await supabase.from("safe_walks").insert({
+    user_id: userId, user_name: userName, destination, latitude, longitude,
     status: "active", shared_with: sharedWith,
     checkin_deadline: new Date(Date.now() + durationMinutes * 60000).toISOString(),
-    created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-  };
-  const sessions = getFromStorage(STORAGE_KEYS.SAFE_WALKS, []);
-  sessions.unshift(session);
-  saveToStorage(STORAGE_KEYS.SAFE_WALKS, sessions);
-  sharedWith.forEach((gId) => {
-    addNotification(gId, "Safe Walk Started", `${userName} started walking to ${destination}`, "safewalk");
-  });
-  return session;
+  }).select().single();
+  for (const gId of sharedWith) {
+    await addNotification(gId, "Safe Walk Started", `${userName} started walking to ${destination}`, "safewalk");
+  }
+  return data;
 }
 
-export function getSafeWalks() {
-  return getFromStorage(STORAGE_KEYS.SAFE_WALKS, []);
+export async function getSafeWalks() {
+  const { data } = await supabase.from("safe_walks").select("*").order("created_at", { ascending: false });
+  return data || [];
 }
 
-export function getUserSafeWalks(userId) {
-  return getSafeWalks().filter((s) => s.user_id === userId);
+export async function getUserSafeWalks(userId) {
+  const { data } = await supabase.from("safe_walks").select("*").eq("user_id", userId).order("created_at", { ascending: false });
+  return data || [];
 }
 
-export function updateSafeWalkStatus(sessionId, status) {
-  const sessions = getFromStorage(STORAGE_KEYS.SAFE_WALKS, []);
-  const idx = sessions.findIndex((s) => s.id === sessionId);
-  if (idx !== -1) {
-    sessions[idx].status = status;
-    sessions[idx].updated_at = new Date().toISOString();
-    saveToStorage(STORAGE_KEYS.SAFE_WALKS, sessions);
-    if (status === "completed") {
-      sessions[idx].shared_with.forEach((gId) => {
-        addNotification(gId, "Safe Arrival", `${sessions[idx].user_name} has checked in safely`, "safewalk");
-      });
+export async function updateSafeWalkStatus(sessionId, status) {
+  await supabase.from("safe_walks").update({ status, updated_at: new Date().toISOString() }).eq("id", sessionId);
+  if (status === "completed") {
+    const { data: walk } = await supabase.from("safe_walks").select("shared_with, user_name").eq("id", sessionId).single();
+    if (walk?.shared_with) {
+      for (const gId of walk.shared_with) {
+        await addNotification(gId, "Safe Arrival", `${walk.user_name} has checked in safely`, "safewalk");
+      }
     }
   }
 }
 
-export function updateSafeWalkLocation(sessionId, latitude, longitude) {
-  const sessions = getFromStorage(STORAGE_KEYS.SAFE_WALKS, []);
-  const idx = sessions.findIndex((s) => s.id === sessionId);
-  if (idx !== -1) {
-    sessions[idx].latitude = latitude;
-    sessions[idx].longitude = longitude;
-    sessions[idx].updated_at = new Date().toISOString();
-    saveToStorage(STORAGE_KEYS.SAFE_WALKS, sessions);
-  }
+export async function updateSafeWalkLocation(sessionId, latitude, longitude) {
+  await supabase.from("safe_walks").update({ latitude, longitude, updated_at: new Date().toISOString() }).eq("id", sessionId);
 }
 
 // ── Incidents ──
-export function createIncident(userId, userName, title, description, severity = "medium", locationDescription, latitude, longitude, imageUrl) {
-  const incident = {
-    id: generateId(), user_id: userId, user_name: userName, title, description,
+export async function createIncident(userId, userName, title, description, severity = "medium", locationDescription, latitude, longitude, imageUrl) {
+  const { data } = await supabase.from("incidents").insert({
+    user_id: userId, user_name: userName, title, description,
     location_description: locationDescription, latitude, longitude, image_url: imageUrl,
-    status: "pending", severity, created_at: new Date().toISOString(),
-  };
-  const incidents = getFromStorage(STORAGE_KEYS.INCIDENTS, []);
-  incidents.unshift(incident);
-  saveToStorage(STORAGE_KEYS.INCIDENTS, incidents);
-  addNotification("all-security", "New Incident Report", `${userName} reported: ${title}`, "incident");
-  return incident;
+    status: "pending", severity,
+  }).select().single();
+  await addNotification("all-security", "New Incident Report", `${userName} reported: ${title}`, "incident");
+  return data;
 }
 
-export function getIncidents() {
-  return getFromStorage(STORAGE_KEYS.INCIDENTS, []);
+export async function getIncidents() {
+  const { data } = await supabase.from("incidents").select("*").order("created_at", { ascending: false });
+  return data || [];
 }
 
-export function getUserIncidents(userId) {
-  return getIncidents().filter((i) => i.user_id === userId);
+export async function getUserIncidents(userId) {
+  const { data } = await supabase.from("incidents").select("*").eq("user_id", userId).order("created_at", { ascending: false });
+  return data || [];
 }
 
-export function updateIncidentStatus(incidentId, status) {
-  const incidents = getFromStorage(STORAGE_KEYS.INCIDENTS, []);
-  const idx = incidents.findIndex((i) => i.id === incidentId);
-  if (idx !== -1) {
-    incidents[idx].status = status;
-    saveToStorage(STORAGE_KEYS.INCIDENTS, incidents);
-    addNotification(incidents[idx].user_id, "Report Update", `Your incident report status: ${status}`, "incident");
-  }
+export async function updateIncidentStatus(incidentId, status) {
+  await supabase.from("incidents").update({ status }).eq("id", incidentId);
+  const { data: inc } = await supabase.from("incidents").select("user_id").eq("id", incidentId).single();
+  if (inc) await addNotification(inc.user_id, "Report Update", `Your incident report status: ${status}`, "incident");
 }
 
 // ── Guardians ──
-export function getGuardians(studentId) {
-  return getFromStorage(STORAGE_KEYS.GUARDIANS, []).filter((g) => g.student_id === studentId);
+export async function getGuardians(studentId) {
+  const { data } = await supabase.from("guardians").select("*").eq("student_id", studentId);
+  return data || [];
 }
 
-export function addGuardian(studentId, name, phone, relationship, email, guardianUserId) {
-  const guardian = {
-    id: generateId(), student_id: studentId, guardian_user_id: guardianUserId,
-    name, phone, email, relationship,
-  };
-  const guardians = getFromStorage(STORAGE_KEYS.GUARDIANS, []);
-  guardians.push(guardian);
-  saveToStorage(STORAGE_KEYS.GUARDIANS, guardians);
-  return guardian;
+export async function addGuardian(studentId, name, phone, relationship, email, guardianUserId) {
+  const { data } = await supabase.from("guardians").insert({
+    student_id: studentId, guardian_user_id: guardianUserId || null, name, phone, email, relationship,
+  }).select().single();
+  return data;
 }
 
-export function deleteGuardian(guardianId) {
-  const guardians = getFromStorage(STORAGE_KEYS.GUARDIANS, []);
-  saveToStorage(STORAGE_KEYS.GUARDIANS, guardians.filter((g) => g.id !== guardianId));
+export async function deleteGuardian(guardianId) {
+  await supabase.from("guardians").delete().eq("id", guardianId);
 }
 
 // ── Broadcasts ──
-export function createBroadcast(createdBy, createdByName, title, message, severity) {
-  const broadcast = {
-    id: generateId(), created_by: createdBy, created_by_name: createdByName,
-    title, message, severity, created_at: new Date().toISOString(),
-  };
-  const broadcasts = getFromStorage(STORAGE_KEYS.BROADCASTS, []);
-  broadcasts.unshift(broadcast);
-  saveToStorage(STORAGE_KEYS.BROADCASTS, broadcasts);
-  addNotification("all", title, message, "broadcast");
-  return broadcast;
+export async function createBroadcast(createdBy, createdByName, title, message, severity) {
+  const { data } = await supabase.from("broadcasts").insert({
+    created_by: createdBy, created_by_name: createdByName, title, message, severity,
+  }).select().single();
+  await addNotification("all", title, message, "broadcast");
+  return data;
 }
 
-export function getBroadcasts() {
-  return getFromStorage(STORAGE_KEYS.BROADCASTS, []);
+export async function getBroadcasts() {
+  const { data } = await supabase.from("broadcasts").select("*").order("created_at", { ascending: false });
+  return data || [];
 }
 
-export function deleteBroadcast(broadcastId) {
-  const broadcasts = getFromStorage(STORAGE_KEYS.BROADCASTS, []);
-  saveToStorage(STORAGE_KEYS.BROADCASTS, broadcasts.filter((b) => b.id !== broadcastId));
+export async function deleteBroadcast(broadcastId) {
+  await supabase.from("broadcasts").delete().eq("id", broadcastId);
 }
 
 // ── Notifications ──
-export function addNotification(userId, title, message, type) {
-  const notif = {
-    id: generateId(), user_id: userId, title, message, type,
-    read: false, created_at: new Date().toISOString(),
-  };
-  const notifs = getFromStorage(STORAGE_KEYS.NOTIFICATIONS, []);
-  notifs.unshift(notif);
-  saveToStorage(STORAGE_KEYS.NOTIFICATIONS, notifs);
-  return notif;
+export async function addNotification(userId, title, message, type) {
+  const { data } = await supabase.from("notifications").insert({
+    user_id: String(userId), title, message, type, read: false,
+  }).select().single();
+  return data;
 }
 
-export function getNotifications(userId, userRole) {
-  return getFromStorage(STORAGE_KEYS.NOTIFICATIONS, []).filter(
-    (n) => n.user_id === userId || n.user_id === "all" || (n.user_id === "all-security" && userRole === "security")
-  );
+export async function getNotifications(userId, userRole) {
+  const targets = [String(userId), "all"];
+  if (userRole === "security") targets.push("all-security");
+  const { data } = await supabase.from("notifications").select("*").in("user_id", targets).order("created_at", { ascending: false });
+  return data || [];
 }
 
-export function getUnreadCount(userId, userRole) {
-  return getNotifications(userId, userRole).filter((n) => !n.read).length;
+export async function getUnreadCount(userId, userRole) {
+  const notifs = await getNotifications(userId, userRole);
+  return notifs.filter((n) => !n.read).length;
 }
 
-export function markNotificationRead(notifId) {
-  const notifs = getFromStorage(STORAGE_KEYS.NOTIFICATIONS, []);
-  const idx = notifs.findIndex((n) => n.id === notifId);
-  if (idx !== -1) {
-    notifs[idx].read = true;
-    saveToStorage(STORAGE_KEYS.NOTIFICATIONS, notifs);
-  }
+export async function markNotificationRead(notifId) {
+  await supabase.from("notifications").update({ read: true }).eq("id", notifId);
 }
 
-export function markAllNotificationsRead(userId, userRole) {
-  const notifs = getFromStorage(STORAGE_KEYS.NOTIFICATIONS, []);
-  notifs.forEach((n) => {
-    if (n.user_id === userId || n.user_id === "all" || (n.user_id === "all-security" && userRole === "security")) {
-      n.read = true;
-    }
-  });
-  saveToStorage(STORAGE_KEYS.NOTIFICATIONS, notifs);
+export async function markAllNotificationsRead(userId, userRole) {
+  const targets = [String(userId), "all"];
+  if (userRole === "security") targets.push("all-security");
+  await supabase.from("notifications").update({ read: true }).in("user_id", targets).eq("read", false);
 }
 
 // ── Change Password ──
-export function changePassword(email, oldPassword, newPassword) {
-  const passwords = getFromStorage(STORAGE_KEYS.PASSWORDS, {});
-  if (passwords[email] !== oldPassword) return { success: false, error: "Current password is incorrect" };
-  passwords[email] = newPassword;
-  saveToStorage(STORAGE_KEYS.PASSWORDS, passwords);
+export async function changePassword(newPassword) {
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) return { success: false, error: error.message };
   return { success: true };
 }

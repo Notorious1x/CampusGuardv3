@@ -21,14 +21,14 @@ export default function BroadcastPage() {
   const [message, setMessage] = useState("");
   const [severity, setSeverity] = useState("medium");
 
-  const refreshData = useCallback(() => { setBroadcasts(api.getBroadcasts()); }, []);
+  const refreshData = useCallback(async () => { setBroadcasts(await api.getBroadcasts()); }, []);
   useEffect(() => { refreshData(); }, [refreshData]);
 
-  const handleDelete = (id, t) => { if (!window.confirm(`Delete broadcast "${t}"?`)) return; api.deleteBroadcast(id); toast.success("Broadcast deleted"); refreshData(); };
+  const handleDelete = async (id, t) => { if (!window.confirm(`Delete broadcast "${t}"?`)) return; await api.deleteBroadcast(id); toast.success("Broadcast deleted"); refreshData(); };
 
-  const handleBroadcast = () => {
+  const handleBroadcast = async () => {
     if (!user || !title.trim() || !message.trim()) { toast.error("Title and message are required"); return; }
-    api.createBroadcast(user.id, user.full_name, title, message, severity);
+    await api.createBroadcast(user.id, user.full_name, title, message, severity);
     toast.success("Alert broadcast sent to all users"); setTitle(""); setMessage(""); setSeverity("medium"); refreshData();
   };
 

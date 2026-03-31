@@ -26,18 +26,18 @@ export default function LoginPage() {
 
   useEffect(() => { if (user) navigate(`/dashboard/${user.role}`); }, [user, navigate]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    const result = login(email, password);
+    const result = await login(email, password);
     if (result.success) { toast.success("Welcome back!"); }
     else { toast.error(result.error || "Login failed"); }
     setLoading(false);
   };
 
-  const handleDemoLogin = (demo) => {
+  const handleDemoLogin = async (demo) => {
     setLoading(true);
-    const result = login(demo.email, demo.password);
+    const result = await login(demo.email, demo.password);
     if (result.success) { toast.success(`Signed in as ${demo.full_name}`); }
     else { toast.error(result.error || "Demo login failed"); }
     setLoading(false);

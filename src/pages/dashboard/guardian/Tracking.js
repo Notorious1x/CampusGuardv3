@@ -3,17 +3,17 @@ import { useAuth } from "../../../context/auth-context";
 import * as api from "../../../lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/components";
 import MapView from "../../../components/MapView";
-import { MapPin, Footprints, Clock, User } from "lucide-react";
+import { MapPin, Footprints, Clock, User, ExternalLink } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export default function GuardianTrackingPage() {
   const { user } = useAuth();
   const [walks, setWalks] = useState([]);
 
-  const refreshData = useCallback(() => {
+  const refreshData = useCallback(async () => {
     if (!user) return;
-    const allWalks = api.getSafeWalks();
-    setWalks(allWalks.filter((s) => s.shared_with.includes(user.id)));
+    const allWalks = await api.getSafeWalks();
+    setWalks(allWalks.filter((s) => s.shared_with?.includes(user.id)));
   }, [user]);
 
   useEffect(() => { refreshData(); const interval = setInterval(refreshData, 3000); return () => clearInterval(interval); }, [refreshData]);
@@ -35,7 +35,7 @@ export default function GuardianTrackingPage() {
                 <div>
                   <div className="flex items-center gap-2"><p className="font-semibold">{w.user_name}</p><span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-600 text-white">LIVE</span></div>
                   <p className="text-sm text-muted-foreground">Destination: {w.destination}</p>
-                  <p className="text-xs text-muted-foreground font-mono mt-1">{w.latitude.toFixed(5)}, {w.longitude.toFixed(5)}</p>
+                  <a href={`https://www.google.com/maps?q=${w.latitude},${w.longitude}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:text-blue-800 font-mono mt-1 inline-flex items-center gap-1">{w.latitude.toFixed(5)}, {w.longitude.toFixed(5)} <ExternalLink className="h-3 w-3" /></a>
                   <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1"><Clock className="h-3 w-3" />Started {formatDistanceToNow(new Date(w.created_at), { addSuffix: true })}</span>
                   {w.checkin_deadline && <p className="text-[10px] text-orange-600 mt-1">Check-in deadline: {new Date(w.checkin_deadline).toLocaleTimeString()}</p>}
                 </div>

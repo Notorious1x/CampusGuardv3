@@ -10,12 +10,12 @@ export default function SettingsPage() {
   const toast = useToast();
   const [settings, setSettings] = useState(null);
 
-  useEffect(() => { if (user) setSettings(api.getUserSettings(user.id)); }, [user]);
+  useEffect(() => { if (user) api.getUserSettings(user.id).then(setSettings); }, [user]);
 
-  const updateSetting = (key, value) => {
+  const updateSetting = async (key, value) => {
     if (!settings) return;
     const updated = { ...settings, [key]: value };
-    setSettings(updated); api.saveUserSettings(updated);
+    setSettings(updated); await api.saveUserSettings(updated);
     if (key === "dark_mode") document.documentElement.classList.toggle("dark", value);
     toast.success("Setting updated");
   };

@@ -1,18 +1,24 @@
 import React, { useEffect, useRef } from "react";
 import L from "leaflet";
 
-const iconColors = {
-  red: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
-  blue: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png",
-  green: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
-};
+function makeSvgIcon(fill) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="28" height="42">
+    <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z" fill="${fill}" stroke="#fff" stroke-width="1.5"/>
+    <circle cx="12" cy="12" r="5" fill="#fff"/>
+  </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: "",
+    iconSize: [28, 42],
+    iconAnchor: [14, 42],
+    popupAnchor: [0, -36],
+  });
+}
+
+const colorMap = { red: "#dc2626", blue: "#2563eb", green: "#16a34a" };
 
 function createIcon(color = "red") {
-  return L.icon({
-    iconUrl: iconColors[color] || iconColors.red,
-    shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-    iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41],
-  });
+  return makeSvgIcon(colorMap[color] || colorMap.red);
 }
 
 export default function MapView({ latitude, longitude, markers = [], zoom = 15, className = "h-[300px] w-full rounded-lg relative z-0" }) {

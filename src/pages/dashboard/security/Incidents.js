@@ -10,10 +10,10 @@ const severityColors = { critical: "bg-red-600 text-white", high: "bg-orange-500
 export default function SecurityIncidentsPage() {
   const toast = useToast();
   const [incidents, setIncidents] = useState([]);
-  const refreshData = useCallback(() => { setIncidents(api.getIncidents()); }, []);
+  const refreshData = useCallback(async () => { setIncidents(await api.getIncidents()); }, []);
   useEffect(() => { refreshData(); }, [refreshData]);
 
-  const handleStatusChange = (id, status) => { api.updateIncidentStatus(id, status); toast.success(`Incident marked as ${status}`); refreshData(); };
+  const handleStatusChange = async (id, status) => { await api.updateIncidentStatus(id, status); toast.success(`Incident marked as ${status}`); refreshData(); };
 
   const pending = incidents.filter((i) => i.status === "pending");
   const investigating = incidents.filter((i) => i.status === "investigating");

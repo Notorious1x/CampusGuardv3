@@ -16,9 +16,9 @@ export default function ProfilePage() {
   if (!user) return null;
   const initials = user.full_name.split(" ").map((n) => n[0]).join("").toUpperCase();
 
-  const handleSave = () => {
-    api.updateUser(user.id, { full_name: form.full_name, phone: form.phone, student_id: form.student_id });
-    refreshUser(); setEditing(false); toast.success("Profile updated");
+  const handleSave = async () => {
+    await api.updateUser(user.id, { full_name: form.full_name, phone: form.phone, student_id: form.student_id });
+    await refreshUser(); setEditing(false); toast.success("Profile updated");
   };
 
   return (

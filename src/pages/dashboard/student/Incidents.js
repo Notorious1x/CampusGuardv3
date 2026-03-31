@@ -20,7 +20,7 @@ export default function IncidentsPage() {
   const [severity, setSeverity] = useState("medium");
   const [submitting, setSubmitting] = useState(false);
 
-  const refreshData = useCallback(() => { if (user) setIncidents(api.getUserIncidents(user.id)); }, [user]);
+  const refreshData = useCallback(async () => { if (user) setIncidents(await api.getUserIncidents(user.id)); }, [user]);
   useEffect(() => { refreshData(); }, [refreshData]);
 
   const handleSubmit = async (e) => {
@@ -28,9 +28,9 @@ export default function IncidentsPage() {
     try {
       let lat, lng;
       if (includeLocation) { const pos = await getCurrentPosition(); lat = pos.latitude; lng = pos.longitude; }
-      api.createIncident(user.id, user.full_name, title, description, severity, locationDesc || undefined, lat, lng);
+      await api.createIncident(user.id, user.full_name, title, description, severity, locationDesc || undefined, lat, lng);
       toast.success("Incident report submitted successfully");
-      setTitle(""); setDescription(""); setLocationDesc(""); refreshData();
+      setTitle(""); setDescription(""); setLocationDesc(""); await refreshData();
     } catch { toast.error("Failed to submit report"); }
     setSubmitting(false);
   };

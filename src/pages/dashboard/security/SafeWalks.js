@@ -2,16 +2,17 @@ import React, { useState, useEffect, useCallback } from "react";
 import * as api from "../../../lib/api";
 import { Card, CardContent, CardHeader, CardTitle, Button, Tabs, TabsList, TabsTrigger, TabsContent } from "../../../components/ui/components";
 import { useToast } from "../../../components/ui/toast";
-import { Footprints, MapPin, Clock, User, XCircle } from "lucide-react";
+import MapView from "../../../components/MapView";
+import { Footprints, MapPin, Clock, User, XCircle, ExternalLink } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export default function SecuritySafeWalksPage() {
   const toast = useToast();
   const [walks, setWalks] = useState([]);
-  const refreshData = useCallback(() => { setWalks(api.getSafeWalks()); }, []);
+  const refreshData = useCallback(async () => { setWalks(await api.getSafeWalks()); }, []);
   useEffect(() => { refreshData(); const interval = setInterval(refreshData, 3000); return () => clearInterval(interval); }, [refreshData]);
 
-  const handleClose = (id) => { api.updateSafeWalkStatus(id, "completed"); toast.success("Session closed by security"); refreshData(); };
+  const handleClose = async (id) => { await api.updateSafeWalkStatus(id, "completed"); toast.success("Session closed by security"); refreshData(); };
 
   const active = walks.filter((w) => w.status === "active");
   const completed = walks.filter((w) => w.status === "completed");
@@ -20,6 +21,16 @@ export default function SecuritySafeWalksPage() {
   return (
     <div className="space-y-6">
       <div><h1 className="text-2xl font-bold flex items-center gap-2"><Footprints className="h-6 w-6 text-green-600" />Safe Walk Sessions</h1><p className="text-muted-foreground text-sm">Monitor active walking sessions across campus</p></div>
+      {active.length > 0 && (
+        <Card><CardContent className="p-0 overflow-hidden rounded-lg">
+          <MapView
+            latitude={active[0].latitude}
+            longitude={active[0].longitude}
+            markers={active.filter((w) => w.latitude && w.longitude).map((w) => ({ lat: w.latitude, lng: w.longitude, label: w.user_name, color: "green" }))}
+          />
+        </CardContent></Card>
+      )}
+
       <Tabs defaultValue="active">
         <TabsList><TabsTrigger value="active">Active ({active.length})</TabsTrigger><TabsTrigger value="completed">Completed ({completed.length})</TabsTrigger><TabsTrigger value="expired">Expired ({expired.length})</TabsTrigger></TabsList>
         <TabsContent value="active" className="space-y-3 mt-4">
@@ -31,6 +42,7 @@ export default function SecuritySafeWalksPage() {
                   <div>
                     <div className="flex items-center gap-2"><p className="font-semibold">{w.user_name}</p><span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-600 text-white">LIVE</span></div>
                     <p className="text-sm text-muted-foreground">Destination: {w.destination}</p>
+                    {w.latitude && w.longitude && <a href={`https://www.google.com/maps?q=${w.latitude},${w.longitude}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:text-blue-800 font-mono mt-1 inline-flex items-center gap-1">{w.latitude.toFixed(5)}, {w.longitude.toFixed(5)} <ExternalLink className="h-3 w-3" /></a>}
                     <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1"><Clock className="h-3 w-3" />Started {formatDistanceToNow(new Date(w.created_at), { addSuffix: true })}</span>
                   </div>
                 </div>

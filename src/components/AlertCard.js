@@ -1,6 +1,6 @@
 import React from "react";
 import { Card, CardContent, Badge, Button } from "./ui/components";
-import { MapPin, Clock, Phone, User, Siren, Heart, ShieldAlert, Car, HelpCircle, AlertTriangle } from "lucide-react";
+import { MapPin, Clock, Phone, User, Siren, Heart, ShieldAlert, Car, HelpCircle, AlertTriangle, ExternalLink } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 const alertTypeConfig = {
@@ -44,7 +44,9 @@ export default function AlertCard({ alert, showActions, onStatusChange }) {
           {alert.user_phone && (
             <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" /><a href={`tel:${alert.user_phone}`} className="text-blue-600 hover:underline">{alert.user_phone}</a></div>
           )}
-          <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-muted-foreground" /><span className="text-xs font-mono">{alert.latitude.toFixed(5)}, {alert.longitude.toFixed(5)}</span></div>
+          {alert.latitude && alert.longitude && (
+            <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-muted-foreground" /><a href={`https://www.google.com/maps?q=${alert.latitude},${alert.longitude}`} target="_blank" rel="noopener noreferrer" className="text-xs font-mono text-blue-600 hover:text-blue-800 inline-flex items-center gap-1">{alert.latitude.toFixed(5)}, {alert.longitude.toFixed(5)} <ExternalLink className="h-3 w-3" /></a></div>
+          )}
           {alert.message && <p className="text-muted-foreground mt-2 text-xs bg-muted p-2 rounded">{alert.message}</p>}
           {alert.responder_name && <p className="text-xs text-blue-600 mt-1">Assigned: {alert.responder_name}</p>}
         </div>

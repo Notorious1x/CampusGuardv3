@@ -25,13 +25,13 @@ export default function RegisterPage() {
   const strengthLabel = ["", "Weak", "Fair", "Good", "Strong", "Very Strong"][passwordStrength];
   const strengthColor = ["", "bg-red-500", "bg-orange-500", "bg-yellow-500", "bg-green-500", "bg-green-600"][passwordStrength];
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (form.password !== form.confirmPassword) { toast.error("Passwords do not match"); return; }
     if (form.password.length < 6) { toast.error("Password must be at least 6 characters"); return; }
     if (form.role === "security" && !securityCode.trim()) { toast.error("Security ID is required"); return; }
     setLoading(true);
-    const result = register(form.email, form.password, form.fullName, form.studentId || undefined, form.phone || undefined, form.role, form.role === "security" ? securityCode.trim() : undefined);
+    const result = await register(form.email, form.password, form.fullName, form.studentId || undefined, form.phone || undefined, form.role, form.role === "security" ? securityCode.trim() : undefined);
     if (result.success) toast.success("Account created successfully!");
     else toast.error(result.error || "Registration failed");
     setLoading(false);

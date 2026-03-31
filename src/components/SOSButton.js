@@ -20,8 +20,13 @@ export default function SOSButton({ onAlertCreated }) {
     if (!user) return;
     setSending(true);
     try {
-      const pos = await getCurrentPosition();
-      api.createAlert(user.id, user.full_name, user.phone, alertType, severity, pos.latitude, pos.longitude, message || undefined);
+      let pos;
+      try { pos = await getCurrentPosition(); } catch {
+        toast.error("Could not get your location. Please enable GPS and try again.");
+        setSending(false);
+        return;
+      }
+      await api.createAlert(user.id, user.full_name, user.phone, alertType, severity, pos.latitude, pos.longitude, message || undefined);
       setSent(true);
       setTimeout(() => {
         setSent(false); setShowDialog(false); setMessage(""); setAlertType("other"); setSeverity("high");

@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../../../context/auth-context";
 import SOSButton from "../../../components/SOSButton";
 import AlertCard from "../../../components/AlertCard";
 import * as api from "../../../lib/api";
-import { getCurrentPosition } from "../../../lib/geolocation";
+import { getCurrentPosition, watchPosition, clearWatch } from "../../../lib/geolocation";
 import { KNUST_SECURITY_NUMBER } from "../../../lib/constants";
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/components";
 import MapView from "../../../components/MapView";
@@ -14,15 +14,18 @@ export default function SOSPage() {
   const [alerts, setAlerts] = useState([]);
   const [position, setPosition] = useState(null);
   const [loadingPos, setLoadingPos] = useState(true);
+  const watchIdRef = useRef(null);
 
-  const refreshData = useCallback(() => {
+  const refreshData = useCallback(async () => {
     if (!user) return;
-    setAlerts(api.getUserAlerts(user.id));
+    setAlerts(await api.getUserAlerts(user.id));
   }, [user]);
 
   useEffect(() => {
     refreshData();
-    getCurrentPosition().then((pos) => { setPosition(pos); setLoadingPos(false); });
+    getCurrentPosition().then((pos) => { setPosition(pos); setLoadingPos(false); }).catch(() => { setLoadingPos(false); });
+    watchIdRef.current = watchPosition((pos) => { setPosition(pos); });
+    return () => clearWatch(watchIdRef.current);
   }, [refreshData]);
 
   return (
@@ -47,7 +50,7 @@ export default function SOSPage() {
           <CardContent>
             {loadingPos ? <div className="h-[300px] flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
             : position ? <MapView latitude={position.latitude} longitude={position.longitude} />
-            : <div className="h-[300px] flex items-center justify-center text-muted-foreground">Unable to get location</div>}
+            : <div className="h-[300px] flex flex-col items-center justify-center text-muted-foreground gap-2"><MapPin className="h-8 w-8 opacity-30" /><p>Unable to get location</p><p className="text-xs">Please allow location access in your browser settings</p></div>}
           </CardContent>
         </Card>
       </div>
