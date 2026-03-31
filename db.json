@@ -1,0 +1,23 @@
+{
+  "users": [],
+  "passwords": [],
+  "settings": [],
+  "alerts": [],
+  "safeWalks": [],
+  "incidents": [],
+  "guardians": [],
+  "broadcasts": [],
+  "notifications": [],
+  "securityIds": [
+    { "id": "sid1", "code": "KNS847291", "used": false, "created_at": "2026-03-01T00:00:00.000Z" },
+    { "id": "sid2", "code": "KNS192837", "used": false, "created_at": "2026-03-01T00:00:00.000Z" },
+    { "id": "sid3", "code": "KNS564738", "used": false, "created_at": "2026-03-01T00:00:00.000Z" },
+    { "id": "sid4", "code": "KNS938475", "used": false, "created_at": "2026-03-01T00:00:00.000Z" },
+    { "id": "sid5", "code": "KNS102938", "used": false, "created_at": "2026-03-01T00:00:00.000Z" },
+    { "id": "sid6", "code": "KNS746382", "used": false, "created_at": "2026-03-01T00:00:00.000Z" },
+    { "id": "sid7", "code": "KNS283746", "used": false, "created_at": "2026-03-01T00:00:00.000Z" },
+    { "id": "sid8", "code": "KNS918273", "used": false, "created_at": "2026-03-01T00:00:00.000Z" },
+    { "id": "sid9", "code": "KNS374829", "used": false, "created_at": "2026-03-01T00:00:00.000Z" },
+    { "id": "sid10", "code": "KNS657483", "used": false, "created_at": "2026-03-01T00:00:00.000Z" }
+  ]
+}
