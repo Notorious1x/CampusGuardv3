@@ -54,7 +54,7 @@ export default function Home() {
       <section className="container mx-auto px-4 pb-20 max-w-7xl">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {features.map((f, i) => (
-            <div key={i} className="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-sm border hover:shadow-md transition-shadow">
+            <div key={i} className="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-sm border hover:shadow-lg hover:-translate-y-1 hover:border-red-200 dark:hover:border-red-900 transition-all duration-300 ease-out">
               <div className="mb-3">{f.icon}</div>
               <h3 className="font-semibold text-base mb-1.5">{f.title}</h3>
               <p className="text-sm text-muted-foreground">{f.desc}</p>
