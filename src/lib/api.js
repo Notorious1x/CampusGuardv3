@@ -41,33 +41,34 @@ export async function claimSecurityId(code, userId, userName) {
   }).eq("code", code.toUpperCase().trim());
 }
 
-// ── Demo Accounts ──
-const DEMO_ACCOUNTS = [
-  { email: "student@demo.com", password: "demo123", full_name: "Demo Student", student_id: "20230001", phone: "+233241000001", role: "student" },
-  { email: "security@demo.com", password: "demo123", full_name: "Demo Security", student_id: "", phone: "+233241000002", role: "security" },
-  { email: "guardian@demo.com", password: "demo123", full_name: "Demo Guardian", student_id: "", phone: "+233241000003", role: "guardian" },
-];
-
-export async function seedDemoAccounts() {
-  for (const demo of DEMO_ACCOUNTS) {
-    await supabase.auth.signUp({
-      email: demo.email,
-      password: demo.password,
-      options: { data: { full_name: demo.full_name, student_id: demo.student_id, phone: demo.phone, role: demo.role } },
-    });
-  }
-}
-
-export function getDemoAccounts() {
-  return DEMO_ACCOUNTS.map(({ email, password, full_name, role }) => ({ email, password, full_name, role }));
-}
-
 // ── Auth ──
 export async function loginUser(email, password) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return { success: false, error: error.message };
+  if (error) {
+    const notConfirmed = /confirm/i.test(error.message);
+    return { success: false, error: error.message, needsVerification: notConfirmed };
+  }
+  if (data.user && !data.user.email_confirmed_at) {
+    await supabase.auth.signOut();
+    return { success: false, error: "Please verify your email before signing in.", needsVerification: true };
+  }
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
   return { success: true, user: profile };
+}
+
+export async function signInWithGoogle() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: `${window.location.origin}/login` },
+  });
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+export async function resendVerificationEmail(email) {
+  const { error } = await supabase.auth.resend({ type: "signup", email });
+  if (error) return { success: false, error: error.message };
+  return { success: true };
 }
 
 export async function registerUser(email, password, full_name, student_id, phone, role = "student", security_code) {
@@ -78,11 +79,17 @@ export async function registerUser(email, password, full_name, student_id, phone
   }
   const { data, error } = await supabase.auth.signUp({
     email, password,
-    options: { data: { full_name, student_id: student_id || "", phone: phone || "", role } },
+    options: {
+      data: { full_name, student_id: student_id || "", phone: phone || "", role },
+      emailRedirectTo: `${window.location.origin}/login`,
+    },
   });
   if (error) return { success: false, error: error.message };
-  if (role === "security" && security_code) {
+  if (role === "security" && security_code && data.user) {
     await claimSecurityId(security_code, data.user.id, full_name);
+  }
+  if (!data.session) {
+    return { success: true, needsVerification: true, email };
   }
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
   return { success: true, user: profile };

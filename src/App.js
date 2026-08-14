@@ -8,6 +8,9 @@ import { ShieldCheck, Loader2 } from "lucide-react";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Privacy from "./pages/legal/Privacy";
+import Terms from "./pages/legal/Terms";
+import FAQ from "./pages/legal/FAQ";
 
 import StudentDashboard from "./pages/dashboard/student/Dashboard";
 import StudentSOS from "./pages/dashboard/student/SOS";
@@ -81,6 +84,9 @@ function AppRoutes() {
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/faq" element={<FAQ />} />
       <Route path="/dashboard" element={<DashboardRedirect />} />
 
       <Route path="/dashboard/student" element={<ProtectedRoute allowedRole="student"><StudentDashboard /></ProtectedRoute>} />

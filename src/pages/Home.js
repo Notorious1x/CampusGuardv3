@@ -63,8 +63,13 @@ export default function Home() {
         </div>
       </section>
       <footer className="border-t py-6">
-        <div className="container mx-auto max-w-7xl px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div className="container mx-auto max-w-7xl px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">CampusGuard &mdash; KNUST Emergency Alert System</p>
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
+            <Link to="/terms" className="hover:text-foreground">Terms</Link>
+            <Link to="/faq" className="hover:text-foreground">FAQs</Link>
+          </div>
           <a href={`tel:${KNUST_SECURITY_NUMBER}`} className="flex items-center gap-1.5 text-sm text-red-600 font-medium">
             <Phone className="h-3.5 w-3.5" />Security: {KNUST_SECURITY_NUMBER}
           </a>

@@ -129,6 +129,7 @@ create table public.settings (
   location_sharing boolean default true,
   dark_mode boolean default false,
   mute_non_emergency boolean default false,
+  push_enabled boolean default false,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );

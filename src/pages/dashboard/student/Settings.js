@@ -3,6 +3,7 @@ import { useAuth } from "../../../context/auth-context";
 import * as api from "../../../lib/api";
 import { Card, CardContent, CardHeader, CardTitle, Label, Separator, Toggle } from "../../../components/ui/components";
 import { useToast } from "../../../components/ui/toast";
+import PushToggle from "../../../components/PushToggle";
 import { Settings, Bell, MapPin, Lock, Moon } from "lucide-react";
 
 export default function SettingsPage() {
@@ -44,6 +45,12 @@ export default function SettingsPage() {
         <Card key={section.title}>
           <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2">{section.icon}{section.title}</CardTitle></CardHeader>
           <CardContent className="space-y-4">
+            {section.title === "Notifications" && (
+              <>
+                <PushToggle settings={settings} onUpdate={updateSetting} />
+                <Separator />
+              </>
+            )}
             {section.items.map((item, i) => (
               <div key={item.id}>{i > 0 && <Separator className="mb-4" />}
                 <div className="flex items-center justify-between">

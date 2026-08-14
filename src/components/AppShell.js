@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/auth-context";
 import * as api from "../lib/api";
+import { supabase } from "../lib/supabase";
+import { showDeviceNotification, registerServiceWorker, getPermission } from "../lib/push";
 import { KNUST_SECURITY_NUMBER } from "../lib/constants";
 import { Avatar, AvatarFallback } from "./ui/components";
 import { cn } from "../lib/utils";
@@ -37,6 +39,34 @@ export default function AppShell({ children }) {
       const interval = setInterval(load, 5000);
       return () => clearInterval(interval);
     }
+  }, [user]);
+
+  // Realtime notifications → device pop-up alerts
+  useEffect(() => {
+    if (!user) return;
+    if (getPermission() === "granted") registerServiceWorker();
+
+    const targets = [String(user.id), "all"];
+    if (user.role === "security") targets.push("all-security");
+
+    const channel = supabase
+      .channel(`notifications-${user.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, async (payload) => {
+        const n = payload.new;
+        if (!n || !targets.includes(n.user_id)) return;
+        setUnread((prev) => prev + 1);
+        try {
+          const settings = await api.getUserSettings(user.id);
+          if (settings.push_enabled === false) return;
+          if (settings.mute_non_emergency && n.type !== "sos") return;
+        } catch {
+          // if settings fail to load, still show the notification
+        }
+        showDeviceNotification(n.title, n.message, `/dashboard/${user.role}/notifications`);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [user]);
 
   const initials = user?.full_name?.split(" ").map((n) => n[0]).join("").toUpperCase() || "U";

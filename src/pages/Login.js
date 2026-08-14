@@ -4,10 +4,18 @@ import { useAuth } from "../context/auth-context";
 import * as api from "../lib/api";
 import { Button, Input, Label, Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/components";
 import { useToast } from "../components/ui/toast";
-import { ShieldCheck, Loader2, Eye, EyeOff, Users, Siren, GraduationCap } from "lucide-react";
+import { ShieldCheck, Loader2, Eye, EyeOff, MailWarning } from "lucide-react";
 
-const roleIcons = { student: <GraduationCap className="h-4 w-4" />, security: <Siren className="h-4 w-4" />, guardian: <Users className="h-4 w-4" /> };
-const roleColors = { student: "border-blue-200 hover:bg-blue-50 text-blue-700", security: "border-red-200 hover:bg-red-50 text-red-700", guardian: "border-green-200 hover:bg-green-50 text-green-700" };
+function GoogleIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z" />
+      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z" />
+      <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z" />
+      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15A11 11 0 0 0 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+    </svg>
+  );
+}
 
 export default function LoginPage() {
   const { login, user } = useAuth();
@@ -17,30 +25,35 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [demoAccounts, setDemoAccounts] = useState([]);
-
-  useEffect(() => {
-    api.seedDemoAccounts();
-    setDemoAccounts(api.getDemoAccounts());
-  }, []);
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resending, setResending] = useState(false);
 
   useEffect(() => { if (user) navigate(`/dashboard/${user.role}`); }, [user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setNeedsVerification(false);
     const result = await login(email, password);
     if (result.success) { toast.success("Welcome back!"); }
+    else if (result.needsVerification) { setNeedsVerification(true); }
     else { toast.error(result.error || "Login failed"); }
     setLoading(false);
   };
 
-  const handleDemoLogin = async (demo) => {
+  const handleGoogleLogin = async () => {
     setLoading(true);
-    const result = await login(demo.email, demo.password);
-    if (result.success) { toast.success(`Signed in as ${demo.full_name}`); }
-    else { toast.error(result.error || "Demo login failed"); }
-    setLoading(false);
+    const result = await api.signInWithGoogle();
+    if (!result.success) { toast.error(result.error || "Google sign-in failed"); setLoading(false); }
+  };
+
+  const handleResend = async () => {
+    if (!email) { toast.error("Enter your email above first"); return; }
+    setResending(true);
+    const result = await api.resendVerificationEmail(email);
+    if (result.success) toast.success("Verification email sent. Check your inbox.");
+    else toast.error(result.error || "Could not resend email");
+    setResending(false);
   };
 
   return (
@@ -75,26 +88,36 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            <div className="mt-6 pt-5 border-t">
-              <p className="text-xs font-medium text-muted-foreground text-center mb-3">Quick Demo Access</p>
-              <div className="grid grid-cols-3 gap-2">
-                {demoAccounts.map((demo) => (
-                  <button
-                    key={demo.role}
-                    onClick={() => handleDemoLogin(demo)}
-                    disabled={loading}
-                    className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border text-xs font-medium transition-colors ${roleColors[demo.role]}`}
-                  >
-                    {roleIcons[demo.role]}
-                    <span className="capitalize">{demo.role}</span>
-                  </button>
-                ))}
+            {needsVerification && (
+              <div className="mt-4 p-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700">
+                <div className="flex items-start gap-2">
+                  <MailWarning className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                  <div className="text-xs text-amber-800 dark:text-amber-300">
+                    <p className="font-medium">Your email is not verified yet.</p>
+                    <p className="mt-0.5">Check your inbox for the verification link, or</p>
+                    <button onClick={handleResend} disabled={resending} className="mt-1 font-semibold underline hover:no-underline disabled:opacity-50">
+                      {resending ? "Sending..." : "Resend verification email"}
+                    </button>
+                  </div>
+                </div>
               </div>
-              <p className="text-[10px] text-muted-foreground/60 text-center mt-2">Password: demo123</p>
+            )}
+
+            <div className="flex items-center gap-3 my-5">
+              <div className="flex-1 border-t" />
+              <span className="text-xs text-muted-foreground">or</span>
+              <div className="flex-1 border-t" />
             </div>
+
+            <Button type="button" variant="outline" onClick={handleGoogleLogin} disabled={loading} className="w-full h-11 font-medium flex items-center justify-center gap-2">
+              <GoogleIcon />Continue with Google
+            </Button>
 
             <p className="text-center text-sm text-muted-foreground mt-6">
               Don't have an account? <Link to="/register" className="text-red-600 hover:underline font-medium">Sign Up</Link>
+            </p>
+            <p className="text-center text-[11px] text-muted-foreground/60 mt-3">
+              By continuing you agree to our <Link to="/terms" className="underline hover:text-foreground">Terms</Link> and <Link to="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>.
             </p>
           </CardContent>
         </Card>

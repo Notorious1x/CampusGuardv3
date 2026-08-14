@@ -31,13 +31,13 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const result = await api.loginUser(email, password);
     if (result.success && result.user) setUser(result.user);
-    return { success: result.success, error: result.error };
+    return { success: result.success, error: result.error, needsVerification: result.needsVerification };
   };
 
   const register = async (email, password, fullName, studentId, phone, role = "student", securityCode) => {
     const result = await api.registerUser(email, password, fullName, studentId, phone, role, securityCode);
     if (result.success && result.user) setUser(result.user);
-    return { success: result.success, error: result.error };
+    return { success: result.success, error: result.error, needsVerification: result.needsVerification, email: result.email };
   };
 
   const logout = async () => { await api.logoutUser(); setUser(null); };

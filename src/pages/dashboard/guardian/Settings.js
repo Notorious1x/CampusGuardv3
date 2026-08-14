@@ -3,6 +3,7 @@ import { useAuth } from "../../../context/auth-context";
 import * as api from "../../../lib/api";
 import { Card, CardContent, CardHeader, CardTitle, Label, Separator, Toggle } from "../../../components/ui/components";
 import { useToast } from "../../../components/ui/toast";
+import PushToggle from "../../../components/PushToggle";
 import { Settings, Bell, Moon, Lock } from "lucide-react";
 
 export default function GuardianSettingsPage() {
@@ -26,6 +27,8 @@ export default function GuardianSettingsPage() {
       <Card>
         <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><Bell className="h-5 w-5" />Notifications</CardTitle></CardHeader>
         <CardContent className="space-y-4">
+          <PushToggle settings={settings} onUpdate={updateSetting} />
+          <Separator />
           <div className="flex items-center justify-between"><div><Label className="cursor-pointer">SOS alerts</Label><p className="text-xs text-muted-foreground">Get notified during emergencies</p></div><Toggle checked={settings.notifications_sos} onChange={(v) => updateSetting("notifications_sos", v)} /></div>
           <Separator />
           <div className="flex items-center justify-between"><div><Label className="cursor-pointer">Campus broadcasts</Label><p className="text-xs text-muted-foreground">Receive campus-wide alerts</p></div><Toggle checked={settings.notifications_broadcasts} onChange={(v) => updateSetting("notifications_broadcasts", v)} /></div>
