@@ -18,18 +18,41 @@ begin
   values (
     new.id,
     new.email,
-    coalesce(new.raw_user_meta_data->>'full_name', ''),
+    coalesce(nullif(new.raw_user_meta_data->>'full_name', ''), new.raw_user_meta_data->>'name', ''),
     coalesce(new.raw_user_meta_data->>'student_id', ''),
     coalesce(new.raw_user_meta_data->>'phone', ''),
     coalesce(new.raw_user_meta_data->>'role', 'student')
-  );
+  )
+  on conflict (id) do nothing;
+
+  if coalesce(new.raw_user_meta_data->>'role', '') = 'security'
+     and coalesce(new.raw_user_meta_data->>'security_code', '') <> '' then
+    update public.security_ids
+      set used = true,
+          used_by = new.id,
+          used_by_name = coalesce(new.raw_user_meta_data->>'full_name', ''),
+          claimed_at = now()
+      where code = upper(new.raw_user_meta_data->>'security_code')
+        and used = false;
+  end if;
+
   return new;
 end;
 $$ language plpgsql security definer;
 
-create trigger on_auth_user_created
+-- OAuth users (e.g. Google) arrive already confirmed
+create trigger on_auth_user_confirmed_insert
   after insert on auth.users
-  for each row execute function public.handle_new_user();
+  for each row
+  when (new.email_confirmed_at is not null)
+  execute function public.handle_new_user();
+
+-- Email/password users get their profile once they confirm
+create trigger on_auth_user_confirmed_update
+  after update of email_confirmed_at on auth.users
+  for each row
+  when (old.email_confirmed_at is null and new.email_confirmed_at is not null)
+  execute function public.handle_new_user();
 
 create table public.security_ids (
   id uuid default gen_random_uuid() primary key,

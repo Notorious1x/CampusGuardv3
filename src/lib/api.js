@@ -80,14 +80,11 @@ export async function registerUser(email, password, full_name, student_id, phone
   const { data, error } = await supabase.auth.signUp({
     email, password,
     options: {
-      data: { full_name, student_id: student_id || "", phone: phone || "", role },
+      data: { full_name, student_id: student_id || "", phone: phone || "", role, security_code: security_code ? security_code.toUpperCase().trim() : "" },
       emailRedirectTo: `${window.location.origin}/login`,
     },
   });
   if (error) return { success: false, error: error.message };
-  if (role === "security" && security_code && data.user) {
-    await claimSecurityId(security_code, data.user.id, full_name);
-  }
   if (!data.session) {
     return { success: true, needsVerification: true, email };
   }
